@@ -1,64 +1,43 @@
-import Fastify from 'fastify';
-import { Pool } from 'pg';
-import { randomUUID } from 'crypto';
-
-const fastify = Fastify({ logger: true });
-
-fastify.get('/', async (request, reply) => {
-  return { hello: 'world' };
-});
-
-async function testPostgres(pool: Pool) {
-  const id = randomUUID();
-  const name = 'Satoshi';
-  const email = 'Nakamoto';
-
-  await pool.query(`DELETE FROM users;`);
-
-  await pool.query(`
-    INSERT INTO users (id, name, email)
-    VALUES ($1, $2, $3);
-  `, [id, name, email]);
-
-  const { rows } = await pool.query(`
-    SELECT * FROM users;
-  `);
-
-  console.log('USERS', rows);
-}
-
-async function createTables(pool: Pool) {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL
-    );
-  `);
-}
+import "reflect-metadata";
+import { initializeDb } from "./db";
+import { container } from "./container";
+import { balanceRoutes } from "./routes/balance.route";
+import { blocksRoutes } from "./routes/blocks.route";
+import { rollbackRoutes } from "./routes/rollback.route";
+import app from "./utils/fastify";
+import { logger } from "./utils/logger";
 
 async function bootstrap() {
-  console.log('Bootstrapping...');
+  logger.info("Bootstrapping...");
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required');
+    throw new Error("DATABASE_URL is required");
   }
 
-  const pool = new Pool({
-    connectionString: databaseUrl
-  });
+  await initializeDb(databaseUrl);
+  logger.info("Database initialized");
 
-  await createTables(pool);
-  await testPostgres(pool);
+  // Container is initialized when imported, but ensure database is ready first
+  // The container will use getDb() which requires database to be initialized
+  logger.info("Container initialized");
+
+  await app.register(blocksRoutes);
+  await app.register(balanceRoutes);
+  await app.register(rollbackRoutes);
+
+  app.get("/", async (request, reply) => {
+    return { status: "ok" };
+  });
 }
 
 try {
   await bootstrap();
-  await fastify.listen({
+  await app.listen({
     port: 3000,
-    host: '0.0.0.0'
-  })
+    host: "0.0.0.0",
+  });
+  logger.info("Server listening on port 3000");
 } catch (err) {
-  fastify.log.error(err)
-  process.exit(1)
-};
+  app.log.error(err);
+  process.exit(1);
+}

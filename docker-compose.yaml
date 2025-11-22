@@ -12,14 +12,5 @@ services:
     ports:
       - "5432:5432"
 
-  api:
-    build: .
-    depends_on:
-      - db
-    environment:
-      DATABASE_URL: postgres://myuser:mypassword@db:5432/mydatabase
-    ports:
-      - "3000:3000"
-
 volumes:
   db_data:
