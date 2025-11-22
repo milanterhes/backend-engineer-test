@@ -20,7 +20,13 @@ bun db:migrate
 
 1. Create a .env file with same values as in .env.example
 
-2. Run the demo:
+2. Start dev server
+
+```bash
+bun start
+```
+
+3. Run the demo:
 
 ```bash
 bun run demo
